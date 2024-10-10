@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calendário Móvel</title>
+    <link href='https://cdn.jsdelivr.net/npm/fullcalendar@5.10.1/main.min.css' rel='stylesheet' />
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@5.10.1/main.min.js'></script>
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@5.10.1/locales-all.min.js'></script>
+    <script src='https://cdn.emailjs.com/dist/email.min.js'></script>
+    <style>
+        #calendar {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .fc-day-sat, .fc-day-sun {
+            background-color: lightgray !important;
+        }
+        .fc-daygrid-day {
+            cursor: pointer;
+        }
+        .green {
+            background-color: green !important;
+            color: white !important;
+        }
+        .yellow {
+            background-color: yellow !important;
+            color: black !important;
+        }
+        .pink {
+            background-color: pink !important;
+            color: black !important;
+        }
+        .radio-label {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 5px;
+            margin: 5px;
+            cursor: pointer;
+            font-weight: normal;
+            border: 2px solid transparent;
+        }
+        .radio-label.green {
+            background-color: green;
+            color: white;
+        }
+        .radio-label.yellow {
+            background-color: yellow;
+            color: black;
+        }
+        .radio-label.pink {
+            background-color: pink;
+            color: black;
+        }
+        input[type="radio"] {
+            display: none;
+        }
+        input[type="radio"]:checked + .radio-label {
+            font-weight: bold;
+            border-color: #000;
+        }
+        #clearSelections, #sendSelections {
+            background-color: white;
+            color: black;
+            border: 2px solid gray;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div id='calendar'></div>
+    <div>
+        <input type="radio" id="option1" name="options" value="1 passeio">
+        <label for="option1" class="radio-label green">1 passeio</label>
+        
+        <input type="radio" id="option2" name="options" value="2 passeios">
+        <label for="option2" class="radio-label yellow">2 passeios</label>
+        
+        <input type="radio" id="option3" name="options" value="avulso">
+        <label for="option3" class="radio-label pink">Avulso</label>
+    </div>
+    <button id="clearSelections">Limpar Tudo</button>
+    <button id="sendSelections">Enviar</button>
+    <script>
+        (function() {
+            emailjs.init("EmcR_rIgg3ZDwfnTx");
+        })();
+
+        document.addEventListener('DOMContentLoaded', function() {
+            var calendarEl = document.getElementById('calendar');
+            var calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                locale: 'pt-br',
+                fixedWeekCount: false,
+                dateClick: function(info) {
+                    var dateEl = info.dayEl;
+                    var currentMonth = calendar.getDate().getMonth();
+                    var clickedMonth = info.date.getMonth();
+
+                    if (currentMonth !== clickedMonth) {
+                        return; // Não permitir seleção fora do mês atual
+                    }
+
+                    var selectedOption = document.querySelector('input[name="options"]:checked');
+                    if (selectedOption) {
+                        var colorClass = selectedOption.value === "1 passeio" ? "green" :
+                                         selectedOption.value === "2 passeios" ? "yellow" :
+                                         "pink";
+                        dateEl.classList.remove('green', 'yellow', 'pink');
+                        dateEl.classList.add(colorClass);
+                    } else {
+                        dateEl.classList.remove('green', 'yellow', 'pink');
+                    }
+                    saveSelection(info.dateStr, dateEl.className);
+                },
+                datesSet: function() {
+                    loadSelections();
+                }
+            });
+            calendar.render();
+
+            document.getElementById('clearSelections').addEventListener('click', function() {
+                if (confirm("Você realmente deseja limpar todas as seleções?")) {
+                    localStorage.clear();
+                    var days = document.getElementsByClassName('fc-daygrid-day');
+                    for (var i = 0; i < days.length; i++) {
+                        days[i].className = 'fc-daygrid-day';
+                    }
+                }
+            });
+
+            document.getElementById('sendSelections').addEventListener('click', function() {
+                var days = document.getElementsByClassName('fc-daygrid-day');
+                var selectedDates = [];
+                for (var i = 0; i < days.length; i++) {
+                    var day = days[i];
+                    var date = day.getAttribute('data-date');
+                    if (day.classList.contains('green') || day.classList.contains('yellow') || day.classList.contains('pink')) {
+                        var color = day.classList.contains('green') ? 'verde' :
+                                    day.classList.contains('yellow') ? 'amarelo' :
+                                    'rosa';
+                        selectedDates.push(`${date}: ${color}`);
+                    }
+                }
+                var emailContent = selectedDates.join('\n');
+                emailjs.send("service_pl0ejdr", "template_0w59zah", {
+                    to_email: "juliozanella@gmail.com",
+                    message: emailContent
+                }).then(function(response) {
+                    alert("E-mail enviado com sucesso!");
+                }, function(error) {
+                    alert("Erro ao enviar e-mail: " + JSON.stringify(error));
+                });
+            });
+
+            var selectedOption = null;
+            var radioButtons = document.querySelectorAll('input[name="options"]');
+            radioButtons.forEach(function(radio) {
+                radio.addEventListener('click', function() {
+                    if (selectedOption === this) {
+                        this.checked = false;
+                        selectedOption = null;
+                    } else {
+                        selectedOption = this;
+                    }
+                });
+            });
+
+            function saveSelection(date, className) {
+                localStorage.setItem('calendar-' + date, className);
+            }
+
+            function loadSelections() {
+                var days = document.getElementsByClassName('fc-daygrid-day');
+                for (var i = 0; i < days.length; i++) {
+                    var day = days[i];
+                    var date = day.getAttribute('data-date');
+                    var className = localStorage.getItem('calendar-' + date);
+                    if (className) {
+                        day.className = 'fc-daygrid-day ' + className;
+                    }
+                }
+            }
+        });
+    </script>
+
+<script type="text/javascript"
+        src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js">
+</script>
+<script type="text/javascript">
+   (function(){
+      emailjs.init({
+        publicKey: "EmcR_rIgg3ZDwfnTx",
+      });
+   })();
+</script>
+</body>
+</html>
